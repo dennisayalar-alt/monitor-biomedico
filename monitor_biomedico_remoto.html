@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor Biomédico Remoto</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#07111f;--panel:#101e30;--muted:#9aabc0;--line:#26384f}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#142a43,#07111f 55%);font-family:Arial,Helvetica,sans-serif;color:#f4f7fb;min-height:100vh}
+main{max-width:1050px;margin:auto;padding:28px 18px 44px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+h1{font-size:clamp(24px,4vw,36px);margin:0 0 7px;letter-spacing:.04em}.sub{color:var(--muted);font-size:13px;letter-spacing:.13em}
+.status{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:10px 14px;font-size:13px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:#e5a23b}.dot.on{background:#22c55e;box-shadow:0 0 12px #22c55e}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{background:linear-gradient(145deg,#14243a,#0d1929);border:1px solid var(--line);border-radius:20px;padding:23px;min-height:190px;box-shadow:0 14px 35px #0003}
+.cardhead{display:flex;align-items:center;gap:11px;color:#c4d1e0;font-size:15px;font-weight:700}.ico{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:23px}
+.red .ico{background:#ef444422}.blue .ico{background:#3b82f622}.orange .ico{background:#f9731622}.cyan .ico{background:#06b6d422}
+.value{font-size:clamp(42px,8vw,66px);font-weight:750;letter-spacing:-.04em;margin:17px 0 2px;font-variant-numeric:tabular-nums}
+.red .value{color:#fb7185}.blue .value{color:#60a5fa}.orange .value{color:#fb923c}.cyan .value{color:#22d3ee}
+.unit{font-size:14px;color:var(--muted)}.foot{display:flex;justify-content:space-between;gap:12px;margin-top:22px;color:var(--muted);font-size:12px}
+.settings{margin-top:22px;background:#0d1929;border:1px solid var(--line);border-radius:16px;padding:17px}
+.settings summary{cursor:pointer;font-weight:700}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:16px}
+label{font-size:12px;color:var(--muted);display:block}input{width:100%;margin-top:6px;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:#07111f;color:white}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:13px}button{background:#2563eb;color:white;border:0;border-radius:9px;padding:11px 17px;font-weight:700;cursor:pointer}button.secondary{background:#26384f}
+.note{color:var(--muted);font-size:12px;line-height:1.5;margin:13px 0 0}
+@media(max-width:600px){main{padding:20px 13px}.grid{gap:10px}.card{padding:16px;min-height:165px;border-radius:15px}.fields{grid-template-columns:1fr}.foot{flex-direction:column}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div><h1>MONITOR BIOMÉDICO</h1><div class="sub">MONITOREO REMOTO EN TIEMPO REAL</div></div>
+    <div class="status"><span id="dot" class="dot"></span><span id="state">Desconectado</span></div>
+  </div>
+  <section class="grid">
+    <article class="card red"><div class="cardhead"><span class="ico">♥</span> FRECUENCIA CARDÍACA</div><div class="value" id="bpm">--</div><div class="unit">latidos por minuto (BPM)</div><div class="foot"><span>MAX30100</span><span id="bpmTime">Sin datos</span></div></article>
+    <article class="card blue"><div class="cardhead"><span class="ico">◉</span> SATURACIÓN DE OXÍGENO</div><div class="value" id="spo2">--</div><div class="unit">porcentaje (%)</div><div class="foot"><span>MAX30100</span><span id="spo2Time">Sin datos</span></div></article>
+    <article class="card orange"><div class="cardhead"><span class="ico">🌡</span> TEMPERATURA</div><div class="value" id="temp">--</div><div class="unit">grados Celsius (°C)</div><div class="foot"><span>DHT11</span><span id="tempTime">Sin datos</span></div></article>
+    <article class="card cyan"><div class="cardhead"><span class="ico">💧</span> HUMEDAD</div><div class="value" id="hum">--</div><div class="unit">humedad relativa (%)</div><div class="foot"><span>DHT11</span><span id="humTime">Sin datos</span></div></article>
+  </section>
+  <details class="settings" open>
+    <summary>Conectar con EMQX Cloud</summary>
+    <div class="fields">
+      <label>Servidor<input id="host" value="le77d117.ala.us-east-1.emqxsl.com"></label>
+      <label>Puerto WSS<input id="port" value="8084"></label>
+      <label>Usuario MQTT<input id="username" value="Dennis" autocomplete="username"></label>
+      <label>Contraseña MQTT<input id="password" type="password" placeholder="Contraseña de EMQX" autocomplete="current-password"></label>
+      <label>Tópico<input id="topic" value="biomedico/#"></label>
+      <label>Client ID<input id="clientid" value=""></label>
+    </div>
+    <div class="actions"><button id="connect">Conectar</button><button class="secondary" id="disconnect">Desconectar</button></div>
+    <p class="note">La conexión usa WSS cifrado. Introduce la contraseña MQTT al abrir el panel. No la publiques dentro del archivo HTML. Este panel muestra los mensajes recibidos; no sustituye un equipo médico certificado.</p>
+  </details>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let client=null;
+if(!$('clientid').value)$('clientid').value='monitor-web-'+Math.random().toString(16).slice(2,10);
+function setState(s,on=false){$('state').textContent=s;$('dot').classList.toggle('on',on)}
+function update(id,timeId,value){const n=Number(String(value).trim());if(!Number.isFinite(n))return;$(id).textContent=(Math.round(n*100)/100).toString();$(timeId).textContent=new Date().toLocaleTimeString()}
+function handle(topic,payload){
+ const value=new TextDecoder().decode(payload).trim();
+ if(topic==='biomedico/bpm')update('bpm','bpmTime',value);
+ else if(topic==='biomedico/spo2')update('spo2','spo2Time',value);
+ else if(topic==='biomedico/temperatura/1')update('temp','tempTime',value);
+ else if(topic==='biomedico/humedad/1')update('hum','humTime',value);
+}
+$('connect').onclick=()=>{
+ if(typeof mqtt==='undefined'){setState('No se pudo cargar MQTT.js');return}
+ if(client)client.end(true);
+ const host=$('host').value.trim(),port=$('port').value.trim(),username=$('username').value.trim(),password=$('password').value,topic=$('topic').value.trim(),clientId=$('clientid').value.trim();
+ if(!host||!port||!username||!password||!topic){setState('Completa los datos MQTT');return}
+ setState('Conectando…');
+ client=mqtt.connect(`wss://${host}:${port}/mqtt`,{clientId,username,password,clean:true,connectTimeout:10000,reconnectPeriod:3000,keepalive:30});
+ client.on('connect',()=>{setState('Conectado a EMQX',true);client.subscribe(topic,{qos:0},err=>{if(err)setState('Error en suscripción')})});
+ client.on('reconnect',()=>setState('Reconectando…'));
+ client.on('close',()=>setState('Desconectado'));
+ client.on('error',err=>setState('Error: '+(err.message||'conexión')));
+ client.on('message',handle);
+};
+$('disconnect').onclick=()=>{if(client){client.end(true);client=null}setState('Desconectado')};
+</script>
+</body>
+</html>
